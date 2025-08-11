@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("VONet-Status")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b398e9c95cdd53db904c6d30c90ce649c639617c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+894624550538523ae9ace0c7f11e1e438110bb4b")]
 [assembly: System.Reflection.AssemblyProductAttribute("VONet-Status")]
 [assembly: System.Reflection.AssemblyTitleAttribute("VONet-Status")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
