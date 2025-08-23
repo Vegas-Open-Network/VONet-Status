@@ -20,3 +20,36 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+.status-list {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+}
+
+.status-up {
+  background-color: #28a745;
+}
+
+.status-degraded {
+  background-color: #ffc107;
+}
+
+.status-down {
+  background-color: #dc3545;
+}
