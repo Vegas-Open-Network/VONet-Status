@@ -1,10 +1,18 @@
-﻿@page
+@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Service Status";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container py-4">
+    <h1 class="mb-4 text-center">Network Service Status</h1>
+    <div class="status-list">
+        @foreach (var service in Model.Services)
+        {
+            <div class="status-item">
+                <span>@service.Name</span>
+                <span class="status-text"><span class="status-indicator @(Model.StatusClass(service.Status))"></span>@service.Status</span>
+            </div>
+        }
+    </div>
 </div>
