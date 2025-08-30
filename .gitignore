@@ -368,3 +368,7 @@ FodyWeavers.xsd
 *.db-shm
 *.db-wal
 status_history.*
+
+# Application data folder
+App_Data/
+**/App_Data/**
