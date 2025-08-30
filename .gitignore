@@ -291,7 +291,7 @@ node_modules/
 # Visual Studio 6 workspace options file
 *.opt
 
-# Visual Studio 6 auto-generated workspace file (contains which files were open etc.)
+# Visual Studio 6 workspace options file (contains which files were open etc.)
 *.vbw
 
 # Visual Studio LightSwitch build output
@@ -361,3 +361,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# VONet Status specific files
+# SQLite database files (will be created automatically)
+*.db
+*.db-shm
+*.db-wal
+status_history.*
