@@ -105,6 +105,12 @@ body {
     border: 1px solid #ced4da;
 }
 
+.service-status.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
 .uptime-percentage {
     font-size: 1.25rem;
     font-weight: 600;
@@ -291,4 +297,246 @@ body {
 /* Check page specific styles */
 .alert .bi {
     flex-shrink: 0;
+}
+
+/* VONet Status Page Styles */
+
+/* Overall Status Styles */
+.status-operational {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-partial {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-major {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.status-unknown {
+    background-color: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+.status-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Service Status Styles */
+.operational {
+    background-color: #28a745;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.partial-outage {
+    background-color: #ffc107;
+    color: #212529;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.major-outage {
+    background-color: #dc3545;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.maintenance {
+    background-color: #17a2b8;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.unknown {
+    background-color: #6c757d;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Service Cards */
+.service-card {
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.service-card:hover {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.uptime-percentage {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+/* Status History Squares */
+.status-history {
+    margin-top: 12px;
+}
+
+.history-label {
+    margin-bottom: 4px;
+}
+
+.history-squares {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+}
+
+.history-square {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    position: relative;
+    cursor: pointer;
+}
+
+.square-operational {
+    background-color: #28a745;
+}
+
+.square-partial {
+    background-color: #ffc107;
+}
+
+.square-outage {
+    background-color: #dc3545;
+}
+
+.square-maintenance {
+    background-color: #17a2b8;
+}
+
+.square-unknown {
+    background-color: #6c757d;
+}
+
+/* Responsive Service Grid */
+.services-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+    .services-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1200px) {
+    .services-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Status Header */
+.status-header {
+    margin-bottom: 2rem;
+}
+
+.overall-status {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+/* Incident Status */
+.investigating {
+    background-color: #ffc107;
+    color: #212529;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.identified {
+    background-color: #fd7e14;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.monitoring {
+    background-color: #17a2b8;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.resolved {
+    background-color: #28a745;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Footer */
+html {
+    position: relative;
+    min-height: 100%;
+}
+
+body {
+    margin-bottom: 60px;
+}
+
+.footer {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    white-space: nowrap;
+    line-height: 60px;
+}
+
+/* Error and Info Messages */
+.alert {
+    margin-bottom: 1.5rem;
+}
+
+.alert code {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.alert .bg-dark code {
+    background-color: #343a40;
+    color: #f8f9fa;
+    padding: 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    word-break: break-all;
 }

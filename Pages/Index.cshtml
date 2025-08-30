@@ -65,19 +65,48 @@
         }
         else
         {
-            <div class="alert alert-info">
-                <i class="bi bi-info-circle me-2"></i>
-                @if (Model.OverallStatus.Status.Contains("Initializing"))
-                {
+            @if (Model.OverallStatus.Status.Contains("Permission Error"))
+            {
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <div>
+                        <strong>Permission Error</strong><br>
+                        The application cannot access or create the data folder required for operation.
+                        <div class="mt-3">
+                            <strong>To fix this issue:</strong>
+                            <ol class="mt-2 mb-2">
+                                <li>Grant write permissions to the application folder</li>
+                                <li>Or create an <code>App_Data</code> folder with write permissions</li>
+                                <li>For IIS, grant permissions to the application pool identity</li>
+                            </ol>
+                        </div>
+                        <div class="mt-3">
+                            <strong>IIS Permission Fix:</strong><br>
+                            <code class="bg-dark text-light p-2 d-block mt-2">
+                                icacls "C:\path\to\your\site\App_Data" /grant "IIS_IUSRS:(OI)(CI)M"
+                            </code>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">
+                                <i class="bi bi-arrow-clockwise me-1"></i>Retry After Fixing Permissions
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+            else if (Model.OverallStatus.Status.Contains("Initializing"))
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
                     <div>
                         <strong>System Initializing</strong><br>
-                        The status monitoring system is starting up. This usually happens on first run or after deployment.
+                        The status monitoring system is starting up. This usually happens on first run.
                         <div class="mt-3">
-                            <strong>What to do:</strong>
+                            <strong>What's happening:</strong>
                             <ul class="mt-2 mb-2">
-                                <li>Wait a few moments for automatic initialization</li>
-                                <li>Refresh this page in 30 seconds</li>
-                                <li>If you have access to the server, run a manual check to populate initial data</li>
+                                <li>Creating data folder and database</li>
+                                <li>Loading service configuration</li>
+                                <li>Preparing monitoring system</li>
                             </ul>
                         </div>
                         <div class="mt-3">
@@ -86,14 +115,17 @@
                             </button>
                         </div>
                     </div>
-                }
-                else
-                {
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
                     <div>
-                        No services configured. Please check your configuration file and ensure the monitoring system is running.
+                        No services configured. Please check your <code>appsettings.json</code> configuration file.
                     </div>
-                }
-            </div>
+                </div>
+            }
         }
     </div>
 

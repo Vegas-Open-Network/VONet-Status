@@ -29,16 +29,19 @@ public class CheckModel : PageModel
         // Security check - require token or local access
         var expectedToken = _configuration["StatusConfiguration:CronToken"];
         var isLocal = IsLocalRequest();
-        var hasValidToken = !string.IsNullOrEmpty(expectedToken) && token == expectedToken;
+        var hasValidToken = !string.IsNullOrEmpty(expectedToken) && !string.IsNullOrEmpty(token) && token == expectedToken;
         
-        IsAuthorized = isLocal || hasValidToken;
+        // Allow access if local OR if token is configured and matches
+        // If no token is configured, allow local access only
+        IsAuthorized = isLocal || (hasValidToken && !string.IsNullOrEmpty(expectedToken));
 
         // Log access attempts
         var clientInfo = $"{HttpContext.Connection.RemoteIpAddress} - User-Agent: {Request.Headers.UserAgent}";
         
         if (!IsAuthorized)
         {
-            _logger.LogWarning("Unauthorized access attempt to check endpoint from {ClientInfo}", clientInfo);
+            _logger.LogWarning("Unauthorized access attempt to check endpoint from {ClientInfo}. IsLocal: {IsLocal}, HasToken: {HasToken}, TokenConfigured: {TokenConfigured}", 
+                clientInfo, isLocal, !string.IsNullOrEmpty(token), !string.IsNullOrEmpty(expectedToken));
             
             // Return 404 to hide the existence of this endpoint
             return NotFound();
