@@ -39,16 +39,17 @@ namespace VONet_Stats.Pages
             {
                 _logger.LogError(ex, "Error loading status page data");
                 
-                // Fallback to empty data
+                // Fallback to empty data with clear indication of the issue
                 Services = new List<ServiceStatusViewModel>();
                 RecentIncidents = new List<IncidentViewModel>();
                 OverallStatus = new Services.SystemOverallStatus
                 {
-                    Status = "System Loading",
+                    Status = "System Initializing - Please wait or run initial check",
                     StatusClass = "status-unknown",
                     Uptime = 0,
                     LastUpdated = DateTime.UtcNow
                 };
+                ServiceHistory = new Dictionary<string, List<StatusHistoryPoint>>();
             }
         }
     }

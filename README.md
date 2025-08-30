@@ -19,16 +19,29 @@ A comprehensive service status monitoring dashboard built with ASP.NET Core Razo
 
 1. **Clone and Run**:
    ```bash
-   git clone [repository-url]
+   git clone https://github.com/Vegas-Open-Network/VONet-Status
    cd VONet-Status
    dotnet run
    ```
 
 2. **Access the Dashboard**: Open `https://localhost:5001` in your browser
 
-3. **Configure Security**: Set up a secure token in `appsettings.json`
+3. **First Run**: The application will automatically create the SQLite database on first startup
 
-4. **Run Initial Check**: Access `/check` locally to populate initial data
+4. **Configure Security**: Set up a secure token in `appsettings.json`
+
+5. **Run Initial Check**: Access `/check` locally to populate initial data, or wait for the system to initialize automatically
+
+### First Run Experience
+
+When you first start the application:
+
+1. **Database Creation**: SQLite database is automatically created in the application directory
+2. **Initial State**: The status page will show "System Initializing" until first checks are run
+3. **Configuration**: Services are loaded from `appsettings.json`
+4. **Auto-Population**: The system will begin monitoring configured services automatically
+
+If you encounter any issues during first run, check the application logs for detailed error information.
 
 ## Configuration
 
@@ -494,12 +507,65 @@ docker run -e StatusConfiguration__CronToken="your-secure-token" vonet-status
 
 1. **Services not appearing**: Check if services are in `appsettings.json` and `Enabled: true`
 2. **Services not disappearing**: Run a manual check cycle after removing from configuration
-3. **404 on /check endpoint**: Check token configuration and ensure proper authentication
-4. **Database file permissions**: Ensure the application has write access to the directory
-5. **Network timeouts**: Adjust `TimeoutSeconds` for slow services
-6. **SSL certificate errors**: Add certificate validation bypass for development
-7. **Memory usage**: Adjust `HistoryRetentionDays` to control database size
-8. **Token not working**: Verify token matches exactly (no extra spaces or characters)
+3. **500 error on startup**: Usually indicates database initialization failure - check logs and permissions
+4. **Database initialization failure**: 
+   - Ensure write permissions to application directory
+   - Check SQLite is available (included with .NET 8)
+   - Verify disk space is available
+   - Try running as administrator/with elevated permissions
+5. **"System Initializing" message persists**: 
+   - Wait 30-60 seconds for automatic initialization
+   - Check application logs for errors
+   - Try accessing `/check` endpoint locally to force initialization
+6. **404 on /check endpoint**: Check token configuration and ensure proper authentication
+7. **Database file permissions**: Ensure the application has write access to the directory
+8. **Network timeouts**: Adjust `TimeoutSeconds` for slow services
+9. **SSL certificate errors**: Add certificate validation bypass for development
+10. **Memory usage**: Adjust `HistoryRetentionDays` to control database size
+11. **Token not working**: Verify token matches exactly (no extra spaces or characters)
+
+### Database Troubleshooting
+
+**Database File Location**: The SQLite database file (`status_history.db`) is created in the application root directory by default.
+
+**Common Database Issues**:
+
+1. **Permission Denied**:
+   ```bash
+   # Linux/macOS: Ensure write permissions
+   chmod 755 /path/to/app/directory
+   
+   # Windows: Run as Administrator or check folder permissions
+   ```
+
+2. **Database Locked**:
+   - Stop the application
+   - Delete `.db-wal` and `.db-shm` files
+   - Restart the application
+
+3. **Corrupted Database**:
+   ```bash
+   # Backup and recreate
+   mv status_history.db status_history.db.backup
+   # Restart application to recreate
+   ```
+
+4. **Custom Database Location**:
+   ```json
+   {
+     "ConnectionStrings": {
+       "DefaultConnection": "Data Source=/custom/path/status_history.db"
+     }
+   }
+   ```
+
+**Database Recovery**:
+If the database becomes corrupted or inaccessible:
+1. Stop the application
+2. Backup the existing database file (if possible)
+3. Delete the `status_history.db` file
+4. Restart the application (database will be recreated)
+5. Run a manual check to begin collecting new data
 
 ### Configuration Troubleshooting
 

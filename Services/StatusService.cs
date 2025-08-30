@@ -13,6 +13,7 @@ public interface IStatusService
     Task<SystemOverallStatus> GetOverallStatusAsync();
     Task<List<StatusHistoryPoint>> GetServiceHistoryAsync(string serviceId, int days = 30);
     Task CheckAllServicesAsync();
+    Task<bool> IsDatabaseHealthyAsync();
 }
 
 public class StatusService : IStatusService
@@ -36,287 +37,371 @@ public class StatusService : IStatusService
 
     public async Task<List<ServiceStatusViewModel>> GetCurrentStatusAsync()
     {
-        // Get configured service IDs from appsettings
-        var configuredServiceIds = _config.Value.Services
-            .Where(s => s.Enabled)
-            .Select(s => s.Id)
-            .ToHashSet();
-
-        // Only get services that are both in database AND in current configuration
-        var statuses = await _context.ServiceStatuses
-            .Where(s => s.IsEnabled && configuredServiceIds.Contains(s.ServiceId))
-            .OrderBy(s => s.Name)
-            .ToListAsync();
-
-        var result = new List<ServiceStatusViewModel>();
-
-        foreach (var status in statuses)
+        try
         {
-            var uptime = await CalculateUptimeAsync(status.ServiceId, 30);
-            result.Add(new ServiceStatusViewModel
-            {
-                ServiceId = status.ServiceId,
-                Name = status.Name,
-                Description = status.Description,
-                Status = status.Status,
-                Uptime = uptime,
-                LastChecked = status.LastChecked,
-                ResponseTime = status.ResponseTimeMs
-            });
-        }
+            // Get configured service IDs from appsettings
+            var configuredServiceIds = _config.Value.Services
+                .Where(s => s.Enabled)
+                .Select(s => s.Id)
+                .ToHashSet();
 
-        return result;
+            // Only get services that are both in database AND in current configuration
+            var statuses = await _context.ServiceStatuses
+                .Where(s => s.IsEnabled && configuredServiceIds.Contains(s.ServiceId))
+                .OrderBy(s => s.Name)
+                .ToListAsync();
+
+            var result = new List<ServiceStatusViewModel>();
+
+            foreach (var status in statuses)
+            {
+                var uptime = await CalculateUptimeAsync(status.ServiceId, 30);
+                result.Add(new ServiceStatusViewModel
+                {
+                    ServiceId = status.ServiceId,
+                    Name = status.Name,
+                    Description = status.Description,
+                    Status = status.Status,
+                    Uptime = uptime,
+                    LastChecked = status.LastChecked,
+                    ResponseTime = status.ResponseTimeMs
+                });
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving current service status");
+            
+            // Return empty list if database is not available
+            // This allows the page to load even if there are database issues
+            return new List<ServiceStatusViewModel>();
+        }
     }
 
     public async Task<List<IncidentViewModel>> GetRecentIncidentsAsync()
     {
-        var incidents = await _context.Incidents
-            .Where(i => i.StartTime >= DateTime.UtcNow.AddDays(-30))
-            .OrderByDescending(i => i.StartTime)
-            .Take(10)
-            .ToListAsync();
-
-        return incidents.Select(i => new IncidentViewModel
+        try
         {
-            Title = i.Title,
-            Description = i.Description,
-            StartTime = i.StartTime,
-            EndTime = i.EndTime,
-            Status = (OutageStatusType)(int)i.Status,
-            AffectedServices = JsonSerializer.Deserialize<string[]>(i.AffectedServices) ?? Array.Empty<string>()
-        }).ToList();
+            var incidents = await _context.Incidents
+                .Where(i => i.StartTime >= DateTime.UtcNow.AddDays(-30))
+                .OrderByDescending(i => i.StartTime)
+                .Take(10)
+                .ToListAsync();
+
+            return incidents.Select(i => new IncidentViewModel
+            {
+                Title = i.Title,
+                Description = i.Description,
+                StartTime = i.StartTime,
+                EndTime = i.EndTime,
+                Status = (OutageStatusType)(int)i.Status,
+                AffectedServices = JsonSerializer.Deserialize<string[]>(i.AffectedServices) ?? Array.Empty<string>()
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving recent incidents");
+            
+            // Return empty list if database is not available
+            return new List<IncidentViewModel>();
+        }
     }
 
     public async Task<SystemOverallStatus> GetOverallStatusAsync()
     {
-        // Get configured service IDs from appsettings
-        var configuredServiceIds = _config.Value.Services
-            .Where(s => s.Enabled)
-            .Select(s => s.Id)
-            .ToHashSet();
-
-        // Only get services that are both in database AND in current configuration
-        var statuses = await _context.ServiceStatuses
-            .Where(s => s.IsEnabled && configuredServiceIds.Contains(s.ServiceId))
-            .ToListAsync();
-
-        if (!statuses.Any())
+        try
         {
+            // Get configured service IDs from appsettings
+            var configuredServiceIds = _config.Value.Services
+                .Where(s => s.Enabled)
+                .Select(s => s.Id)
+                .ToHashSet();
+
+            // Only get services that are both in database AND in current configuration
+            var statuses = await _context.ServiceStatuses
+                .Where(s => s.IsEnabled && configuredServiceIds.Contains(s.ServiceId))
+                .ToListAsync();
+
+            if (!statuses.Any())
+            {
+                return new SystemOverallStatus
+                {
+                    Status = "No Services Configured",
+                    StatusClass = "status-unknown",
+                    Uptime = 0,
+                    LastUpdated = DateTime.UtcNow
+                };
+            }
+
+            var operationalCount = statuses.Count(s => s.Status == ServiceStatusType.Operational);
+            var totalServices = statuses.Count;
+            
+            string status;
+            string statusClass;
+
+            if (operationalCount == totalServices)
+            {
+                status = "All Systems Operational";
+                statusClass = "status-operational";
+            }
+            else if (operationalCount >= totalServices * 0.8)
+            {
+                status = "Partial System Outage";
+                statusClass = "status-partial";
+            }
+            else
+            {
+                status = "Major System Outage";
+                statusClass = "status-major";
+            }
+
+            var overallUptime = 0.0;
+            foreach (var serviceStatus in statuses)
+            {
+                var uptime = await CalculateUptimeAsync(serviceStatus.ServiceId, 30);
+                overallUptime += uptime;
+            }
+            overallUptime /= statuses.Count;
+
             return new SystemOverallStatus
             {
-                Status = "No Services Configured",
+                Status = status,
+                StatusClass = statusClass,
+                Uptime = overallUptime,
+                LastUpdated = DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving overall system status");
+            
+            // Return a fallback status if database is not available
+            return new SystemOverallStatus
+            {
+                Status = "System Initializing",
                 StatusClass = "status-unknown",
                 Uptime = 0,
                 LastUpdated = DateTime.UtcNow
             };
         }
-
-        var operationalCount = statuses.Count(s => s.Status == ServiceStatusType.Operational);
-        var totalServices = statuses.Count;
-        
-        string status;
-        string statusClass;
-
-        if (operationalCount == totalServices)
-        {
-            status = "All Systems Operational";
-            statusClass = "status-operational";
-        }
-        else if (operationalCount >= totalServices * 0.8)
-        {
-            status = "Partial System Outage";
-            statusClass = "status-partial";
-        }
-        else
-        {
-            status = "Major System Outage";
-            statusClass = "status-major";
-        }
-
-        var overallUptime = 0.0;
-        foreach (var serviceStatus in statuses)
-        {
-            var uptime = await CalculateUptimeAsync(serviceStatus.ServiceId, 30);
-            overallUptime += uptime;
-        }
-        overallUptime /= statuses.Count;
-
-        return new SystemOverallStatus
-        {
-            Status = status,
-            StatusClass = statusClass,
-            Uptime = overallUptime,
-            LastUpdated = DateTime.UtcNow
-        };
     }
 
     public async Task<List<StatusHistoryPoint>> GetServiceHistoryAsync(string serviceId, int days = 30)
     {
-        var startDate = DateTime.UtcNow.AddDays(-days);
-        
-        var history = await _context.StatusHistory
-            .Where(h => h.ServiceId == serviceId && h.Timestamp >= startDate)
-            .OrderBy(h => h.Timestamp)
-            .ToListAsync();
-
-        var result = new List<StatusHistoryPoint>();
-        var currentDate = startDate.Date;
-        var endDate = DateTime.UtcNow.Date;
-
-        while (currentDate <= endDate)
+        try
         {
-            var dayHistory = history.Where(h => h.Timestamp.Date == currentDate).ToList();
+            var startDate = DateTime.UtcNow.AddDays(-days);
             
-            if (dayHistory.Any())
+            var history = await _context.StatusHistory
+                .Where(h => h.ServiceId == serviceId && h.Timestamp >= startDate)
+                .OrderBy(h => h.Timestamp)
+                .ToListAsync();
+
+            var result = new List<StatusHistoryPoint>();
+            var currentDate = startDate.Date;
+            var endDate = DateTime.UtcNow.Date;
+
+            while (currentDate <= endDate)
             {
-                var operationalCount = dayHistory.Count(h => h.Status == ServiceStatusType.Operational);
-                var uptimePercentage = (double)operationalCount / dayHistory.Count * 100;
+                var dayHistory = history.Where(h => h.Timestamp.Date == currentDate).ToList();
                 
-                result.Add(new StatusHistoryPoint
+                if (dayHistory.Any())
                 {
-                    Date = currentDate,
-                    UptimePercentage = uptimePercentage,
-                    Status = GetDominantStatus(dayHistory)
-                });
-            }
-            else
-            {
-                // No data for this day, assume unknown
-                result.Add(new StatusHistoryPoint
+                    var operationalCount = dayHistory.Count(h => h.Status == ServiceStatusType.Operational);
+                    var uptimePercentage = (double)operationalCount / dayHistory.Count * 100;
+                    
+                    result.Add(new StatusHistoryPoint
+                    {
+                        Date = currentDate,
+                        UptimePercentage = uptimePercentage,
+                        Status = GetDominantStatus(dayHistory)
+                    });
+                }
+                else
                 {
-                    Date = currentDate,
-                    UptimePercentage = 0,
-                    Status = ServiceStatusType.MajorOutage
-                });
+                    // No data for this day, assume unknown
+                    result.Add(new StatusHistoryPoint
+                    {
+                        Date = currentDate,
+                        UptimePercentage = 0,
+                        Status = ServiceStatusType.MajorOutage
+                    });
+                }
+
+                currentDate = currentDate.AddDays(1);
             }
 
-            currentDate = currentDate.AddDays(1);
+            return result;
         }
-
-        return result;
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving service history for {ServiceId}", serviceId);
+            
+            // Return empty list if database is not available
+            return new List<StatusHistoryPoint>();
+        }
     }
 
     public async Task CheckAllServicesAsync()
     {
         _logger.LogInformation("Starting service checks");
 
-        var serviceConfigs = _config.Value.Services.Where(s => s.Enabled).ToList();
-
-        // First, mark services as disabled if they're no longer in configuration
-        await DisableRemovedServicesAsync();
-
-        foreach (var serviceConfig in serviceConfigs)
+        try
         {
-            try
+            var serviceConfigs = _config.Value.Services.Where(s => s.Enabled).ToList();
+
+            // First, mark services as disabled if they're no longer in configuration
+            await DisableRemovedServicesAsync();
+
+            foreach (var serviceConfig in serviceConfigs)
             {
-                var result = await _serviceChecker.CheckServiceAsync(serviceConfig);
-                await UpdateServiceStatusAsync(serviceConfig, result);
+                try
+                {
+                    var result = await _serviceChecker.CheckServiceAsync(serviceConfig);
+                    await UpdateServiceStatusAsync(serviceConfig, result);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error checking service {ServiceId}", serviceConfig.Id);
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking service {ServiceId}", serviceConfig.Id);
-            }
+
+            // Clean up old history
+            await CleanupOldHistoryAsync();
+
+            _logger.LogInformation("Completed service checks");
         }
-
-        // Clean up old history
-        await CleanupOldHistoryAsync();
-
-        _logger.LogInformation("Completed service checks");
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Critical error during service checks - database may not be available");
+            throw; // Re-throw for the calling code to handle
+        }
     }
 
     private async Task DisableRemovedServicesAsync()
     {
-        // Get configured service IDs
-        var configuredServiceIds = _config.Value.Services
-            .Select(s => s.Id)
-            .ToHashSet();
-
-        // Find services in database that are no longer in configuration
-        var removedServices = await _context.ServiceStatuses
-            .Where(s => !configuredServiceIds.Contains(s.ServiceId))
-            .ToListAsync();
-
-        if (removedServices.Any())
+        try
         {
-            _logger.LogInformation("Disabling {Count} services no longer in configuration: {ServiceIds}", 
-                removedServices.Count, 
-                string.Join(", ", removedServices.Select(s => s.ServiceId)));
+            // Get configured service IDs
+            var configuredServiceIds = _config.Value.Services
+                .Select(s => s.Id)
+                .ToHashSet();
 
-            // Mark them as disabled instead of deleting (preserves history)
-            foreach (var service in removedServices)
+            // Find services in database that are no longer in configuration
+            var removedServices = await _context.ServiceStatuses
+                .Where(s => !configuredServiceIds.Contains(s.ServiceId))
+                .ToListAsync();
+
+            if (removedServices.Any())
             {
-                service.IsEnabled = false;
-                _logger.LogWarning("Service {ServiceId} disabled - no longer in configuration", service.ServiceId);
-            }
+                _logger.LogInformation("Disabling {Count} services no longer in configuration: {ServiceIds}", 
+                    removedServices.Count, 
+                    string.Join(", ", removedServices.Select(s => s.ServiceId)));
 
-            await _context.SaveChangesAsync();
+                // Mark them as disabled instead of deleting (preserves history)
+                foreach (var service in removedServices)
+                {
+                    service.IsEnabled = false;
+                    _logger.LogWarning("Service {ServiceId} disabled - no longer in configuration", service.ServiceId);
+                }
+
+                await _context.SaveChangesAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error disabling removed services");
+            // Don't re-throw - this is not critical for service checks to continue
         }
     }
 
     private async Task UpdateServiceStatusAsync(ServiceConfiguration config, CheckResult result)
     {
-        var now = DateTime.UtcNow;
-        var status = result.IsHealthy ? ServiceStatusType.Operational : ServiceStatusType.MajorOutage;
-
-        // Get or create service status
-        var serviceStatus = await _context.ServiceStatuses
-            .FirstOrDefaultAsync(s => s.ServiceId == config.Id);
-
-        if (serviceStatus == null)
+        try
         {
-            serviceStatus = new ServiceStatus
+            var now = DateTime.UtcNow;
+            var status = result.IsHealthy ? ServiceStatusType.Operational : ServiceStatusType.MajorOutage;
+
+            // Get or create service status
+            var serviceStatus = await _context.ServiceStatuses
+                .FirstOrDefaultAsync(s => s.ServiceId == config.Id);
+
+            if (serviceStatus == null)
+            {
+                serviceStatus = new ServiceStatus
+                {
+                    ServiceId = config.Id,
+                    Name = config.Name,
+                    Description = config.Description,
+                    Status = status,
+                    ResponseTimeMs = result.ResponseTime,
+                    LastChecked = now,
+                    LastStatusChange = now,
+                    ErrorMessage = result.ErrorMessage,
+                    IsEnabled = config.Enabled
+                };
+                _context.ServiceStatuses.Add(serviceStatus);
+                _logger.LogInformation("Created new service status for {ServiceId}", config.Id);
+            }
+            else
+            {
+                var statusChanged = serviceStatus.Status != status;
+                var wasDisabled = !serviceStatus.IsEnabled;
+                
+                // Update all fields from configuration (in case they changed)
+                serviceStatus.Name = config.Name;
+                serviceStatus.Description = config.Description;
+                serviceStatus.Status = status;
+                serviceStatus.ResponseTimeMs = result.ResponseTime;
+                serviceStatus.LastChecked = now;
+                serviceStatus.ErrorMessage = result.ErrorMessage;
+                serviceStatus.IsEnabled = config.Enabled; // Re-enable if it was disabled
+                
+                if (statusChanged)
+                {
+                    serviceStatus.LastStatusChange = now;
+                    _logger.LogWarning("Service {ServiceId} status changed to {Status}", config.Id, status);
+                }
+
+                if (wasDisabled && config.Enabled)
+                {
+                    _logger.LogInformation("Service {ServiceId} re-enabled in configuration", config.Id);
+                }
+            }
+
+            // Add to history
+            var historyEntry = new StatusHistory
             {
                 ServiceId = config.Id,
-                Name = config.Name,
-                Description = config.Description,
                 Status = status,
                 ResponseTimeMs = result.ResponseTime,
-                LastChecked = now,
-                LastStatusChange = now,
-                ErrorMessage = result.ErrorMessage,
-                IsEnabled = config.Enabled
+                Timestamp = now,
+                ErrorMessage = result.ErrorMessage
             };
-            _context.ServiceStatuses.Add(serviceStatus);
-            _logger.LogInformation("Created new service status for {ServiceId}", config.Id);
+            _context.StatusHistory.Add(historyEntry);
+
+            await _context.SaveChangesAsync();
         }
-        else
+        catch (Exception ex)
         {
-            var statusChanged = serviceStatus.Status != status;
-            var wasDisabled = !serviceStatus.IsEnabled;
-            
-            // Update all fields from configuration (in case they changed)
-            serviceStatus.Name = config.Name;
-            serviceStatus.Description = config.Description;
-            serviceStatus.Status = status;
-            serviceStatus.ResponseTimeMs = result.ResponseTime;
-            serviceStatus.LastChecked = now;
-            serviceStatus.ErrorMessage = result.ErrorMessage;
-            serviceStatus.IsEnabled = config.Enabled; // Re-enable if it was disabled
-            
-            if (statusChanged)
-            {
-                serviceStatus.LastStatusChange = now;
-                _logger.LogWarning("Service {ServiceId} status changed to {Status}", config.Id, status);
-            }
-
-            if (wasDisabled && config.Enabled)
-            {
-                _logger.LogInformation("Service {ServiceId} re-enabled in configuration", config.Id);
-            }
+            _logger.LogError(ex, "Error updating service status for {ServiceId}", config.Id);
+            // Don't re-throw - log the error but continue with other services
         }
+    }
 
-        // Add to history
-        var historyEntry = new StatusHistory
+    public async Task<bool> IsDatabaseHealthyAsync()
+    {
+        try
         {
-            ServiceId = config.Id,
-            Status = status,
-            ResponseTimeMs = result.ResponseTime,
-            Timestamp = now,
-            ErrorMessage = result.ErrorMessage
-        };
-        _context.StatusHistory.Add(historyEntry);
-
-        await _context.SaveChangesAsync();
+            return await _context.Database.CanConnectAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Database health check failed");
+            return false;
+        }
     }
 
     private async Task<double> CalculateUptimeAsync(string serviceId, int days)
