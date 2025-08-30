@@ -1,0 +1,191 @@
+@page
+@model CheckModel
+@{
+    ViewData["Title"] = "System Check";
+    Layout = "_Layout";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="text-center mb-4">
+                <h1 class="display-6"><i class="bi bi-shield-lock me-2"></i>System Check</h1>
+                <p class="lead text-muted">Internal service status verification endpoint</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Internal Use Only:</strong> This endpoint is for automated monitoring systems and local administration.
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    @if (Model.Success)
+                    {
+                        <div class="alert alert-success d-flex align-items-center" role="alert">
+                            <i class="bi bi-check-circle-fill me-3 fs-4"></i>
+                            <div>
+                                <h5 class="alert-heading mb-1">Check Completed Successfully</h5>
+                                <p class="mb-0">@Model.Message</p>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-danger d-flex align-items-center" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-3 fs-4"></i>
+                            <div>
+                                <h5 class="alert-heading mb-1">Check Failed</h5>
+                                <p class="mb-0">@Model.Message</p>
+                            </div>
+                        </div>
+                    }
+
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-clock fs-2 text-primary"></i>
+                                    <h6 class="card-title mt-2">Execution Time</h6>
+                                    <p class="card-text fs-5">@Model.ExecutionTime.TotalSeconds.ToString("F2")s</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-calendar-check fs-2 text-success"></i>
+                                    <h6 class="card-title mt-2">Check Time</h6>
+                                    <p class="card-text fs-6">@DateTime.Now.ToString("MMM dd, yyyy HH:mm:ss")</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <a href="/" class="btn btn-primary me-2">
+                            <i class="bi bi-house me-1"></i>Return to Status Page
+                        </a>
+                        <button onclick="location.reload()" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-clockwise me-1"></i>Run Check Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h5><i class="bi bi-gear me-2"></i>Configuration & Security</h5>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h6><i class="bi bi-info-circle me-2"></i>Access Control</h6>
+                            <p class="mb-2">This endpoint is protected by:</p>
+                            <ul class="mb-0">
+                                <li><strong>Local Access:</strong> Only accessible from localhost/127.0.0.1</li>
+                                <li><strong>Token Authentication:</strong> Remote access requires valid token parameter</li>
+                                <li><strong>Logging:</strong> All access attempts are logged for security monitoring</li>
+                            </ul>
+                        </div>
+                        
+                        <h6>Token Configuration</h6>
+                        <p>Add a secure token to your <code>appsettings.json</code>:</p>
+                        <div class="bg-dark text-light p-3 rounded mb-3">
+                            <code>{<br>
+                            &nbsp;&nbsp;"StatusConfiguration": {<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"CronToken": "your-secure-random-token-here",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;// ... other settings<br>
+                            &nbsp;&nbsp;}<br>
+                            }</code>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <strong>Security Note:</strong> Generate a strong, random token (32+ characters) and keep it secure. 
+                            Use a password manager or cryptographically secure random generator.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h5><i class="bi bi-terminal me-2"></i>Automation Setup</h5>
+                <div class="card">
+                    <div class="card-body">
+                        <p class="mb-3">Configure automated monitoring using these secure methods:</p>
+                        
+                        <h6>Local Cron Job (Recommended)</h6>
+                        <div class="bg-dark text-light p-3 rounded mb-3">
+                            <code># Run every 5 minutes from local machine<br>
+                            */5 * * * * curl -s "http://localhost:5000/check?format=json" > /dev/null</code>
+                        </div>
+
+                        <h6>Remote Cron Job (with Token)</h6>
+                        <div class="bg-dark text-light p-3 rounded mb-3">
+                            <code># Run every 5 minutes with authentication<br>
+                            */5 * * * * curl -s "@Request.Scheme://@Request.Host/check?token=YOUR_TOKEN&format=json" > /dev/null</code>
+                        </div>
+
+                        <h6>Docker/Kubernetes CronJob</h6>
+                        <div class="bg-dark text-light p-3 rounded mb-3">
+                            <code>apiVersion: batch/v1<br>
+                            kind: CronJob<br>
+                            metadata:<br>
+                            &nbsp;&nbsp;name: vonet-status-check<br>
+                            spec:<br>
+                            &nbsp;&nbsp;schedule: "*/5 * * * *"<br>
+                            &nbsp;&nbsp;jobTemplate:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;spec:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;template:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spec:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;containers:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- name: checker<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;image: curlimages/curl<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;env:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;- name: CHECK_TOKEN<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;valueFrom:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;secretKeyRef:<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;name: status-check-secret<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;key: token<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;command: ["curl", "-s", "@Request.Scheme://@Request.Host/check?token=$(CHECK_TOKEN)&format=json"]<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;restartPolicy: OnFailure</code>
+                        </div>
+
+                        <h6>Windows Task Scheduler</h6>
+                        <div class="bg-dark text-light p-3 rounded">
+                            <code>powershell -Command "Invoke-WebRequest -Uri '@Request.Scheme://@Request.Host/check?token=YOUR_TOKEN&format=json' -UseBasicParsing"</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h5><i class="bi bi-bug me-2"></i>Monitoring & Troubleshooting</h5>
+                <div class="card">
+                    <div class="card-body">
+                        <h6>Response Codes</h6>
+                        <ul>
+                            <li><strong>200 OK:</strong> Check completed successfully</li>
+                            <li><strong>404 Not Found:</strong> Unauthorized access attempt</li>
+                            <li><strong>500 Error:</strong> Internal error during check</li>
+                        </ul>
+                        
+                        <h6>Logging</h6>
+                        <p>Check application logs for:</p>
+                        <ul>
+                            <li>Unauthorized access attempts</li>
+                            <li>Check execution times</li>
+                            <li>Service check errors</li>
+                            <li>Token validation failures</li>
+                        </ul>
+                        
+                        <h6>Security Monitoring</h6>
+                        <p>Monitor logs for repeated 404 responses which may indicate:</p>
+                        <ul class="mb-0">
+                            <li>Automated scanning attempts</li>
+                            <li>Missing or incorrect tokens</li>
+                            <li>Potential security threats</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
