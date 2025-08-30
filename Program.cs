@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using VONet_Stats.Configuration;
 using VONet_Stats.Data;
 using VONet_Stats.Services;
+using VONet_Stats.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,12 +29,8 @@ builder.Services.AddScoped<IStatusService, StatusService>();
 
 var app = builder.Build();
 
-// Ensure database is created
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<StatusDbContext>();
-    context.Database.EnsureCreated();
-}
+// Initialize database with proper error handling
+await app.InitializeDatabaseAsync();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
