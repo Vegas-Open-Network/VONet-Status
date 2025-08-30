@@ -16,117 +16,165 @@ public static class DatabaseExtensions
             var connectionString = app.Configuration.GetConnectionString("DefaultConnection");
             var dataDirectory = app.Configuration["DataDirectory"] ?? "App_Data";
             
-            logger.LogInformation("Initializing database with connection string: {ConnectionString}", connectionString);
-            logger.LogInformation("Data directory: {DataDirectory}", dataDirectory);
+            // Get the correct application root path
+            var webHostEnvironment = scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>();
+            var contentRoot = webHostEnvironment.ContentRootPath;
             
-            // Ensure the data directory exists with proper error handling
-            await EnsureDataDirectoryAsync(dataDirectory, logger);
+            logger.LogInformation("?? VONet Status - Database Initialization");
+            logger.LogInformation("?? Application root: {ContentRoot}", contentRoot);
+            logger.LogInformation("??? Data directory: {DataDirectory}", dataDirectory);
             
-            // Create full database path and ensure directory exists
-            var fullDatabasePath = await EnsureDatabaseDirectoryAsync(connectionString, logger);
+            // Create data folder and test permissions
+            var dataFolderPath = await CreateDataFolderAsync(dataDirectory, contentRoot, logger);
             
-            // Test database connection and create if needed
-            logger.LogInformation("Testing database connectivity...");
-            var canConnect = await context.Database.CanConnectAsync();
-            if (!canConnect)
-            {
-                logger.LogInformation("Database does not exist, creating...");
-                await context.Database.EnsureCreatedAsync();
-                logger.LogInformation("Database created successfully at: {DatabasePath}", fullDatabasePath);
-            }
-            else
-            {
-                logger.LogInformation("Database connection verified at: {DatabasePath}", fullDatabasePath);
-            }
+            // Initialize database
+            await InitializeDatabaseAsync(context, connectionString, contentRoot, logger);
             
-            // Verify database structure by testing a simple query
-            try
-            {
-                var serviceCount = await context.ServiceStatuses.CountAsync();
-                logger.LogInformation("Database verification successful. Found {ServiceCount} existing service records", serviceCount);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Database structure verification failed. Attempting to recreate...");
-                await context.Database.EnsureDeletedAsync();
-                await context.Database.EnsureCreatedAsync();
-                logger.LogInformation("Database recreated successfully");
-            }
-            
-            // Test write permissions by creating a test record
-            await TestDatabaseWritePermissions(context, logger);
+            logger.LogInformation("? Database initialization completed successfully");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.LogError("? PERMISSION ERROR: {Message}", ex.Message);
+            logger.LogError("?? SOLUTION: Grant write permissions to the application folder or App_Data subfolder");
+            logger.LogError("?? For IIS: icacls \"{Path}\\App_Data\" /grant \"IIS_IUSRS:(OI)(CI)M\"", 
+                scope.ServiceProvider.GetRequiredService<IWebHostEnvironment>().ContentRootPath);
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            logger.LogError("? FOLDER ERROR: {Message}", ex.Message);
+            logger.LogError("?? SOLUTION: Ensure the application has access to create folders");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to initialize database. The application will continue but may not function correctly.");
-            LogTroubleshootingTips(logger);
+            logger.LogError(ex, "? DATABASE INITIALIZATION FAILED");
+            logger.LogError("?? Troubleshooting steps:");
+            logger.LogError("   1. Check folder permissions (write access required)");
+            logger.LogError("   2. Ensure .NET 8 Hosting Bundle is installed");
+            logger.LogError("   3. Verify sufficient disk space");
+            logger.LogError("   4. Check Windows Event Viewer for additional details");
         }
         
         return app;
     }
 
-    private static async Task EnsureDataDirectoryAsync(string dataDirectory, ILogger logger)
+    private static async Task<string> CreateDataFolderAsync(string dataDirectory, string contentRoot, ILogger logger)
     {
         try
         {
-            var fullPath = Path.GetFullPath(dataDirectory);
-            
-            if (!Directory.Exists(fullPath))
+            // Resolve full path
+            string dataFolderPath;
+            if (Path.IsPathRooted(dataDirectory))
             {
-                logger.LogInformation("Creating data directory: {DataDirectory}", fullPath);
-                Directory.CreateDirectory(fullPath);
-                
-                // Set permissions for IIS (Windows)
-                if (OperatingSystem.IsWindows())
-                {
-                    try
-                    {
-                        var directoryInfo = new DirectoryInfo(fullPath);
-                        logger.LogInformation("Data directory created successfully: {DataDirectory}", fullPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Could not set directory permissions. Manual permission setup may be required.");
-                    }
-                }
+                dataFolderPath = dataDirectory;
             }
             else
             {
-                logger.LogInformation("Data directory already exists: {DataDirectory}", fullPath);
+                dataFolderPath = Path.Combine(contentRoot, dataDirectory);
             }
+            
+            dataFolderPath = Path.GetFullPath(dataFolderPath);
+            logger.LogInformation("?? Data folder path: {DataFolderPath}", dataFolderPath);
+            
+            // Create folder if it doesn't exist
+            if (!Directory.Exists(dataFolderPath))
+            {
+                logger.LogInformation("?? Creating data folder...");
+                Directory.CreateDirectory(dataFolderPath);
+                logger.LogInformation("? Data folder created successfully");
+            }
+            else
+            {
+                logger.LogInformation("?? Data folder already exists");
+            }
+            
+            // Test write permissions immediately
+            await TestWritePermissionsAsync(dataFolderPath, logger);
+            
+            return dataFolderPath;
         }
-        catch (Exception ex)
+        catch (UnauthorizedAccessException)
         {
-            logger.LogError(ex, "Failed to create data directory: {DataDirectory}", dataDirectory);
-            throw;
+            throw new UnauthorizedAccessException($"Cannot create or access data folder '{dataDirectory}'. Check folder permissions.");
+        }
+        catch (DirectoryNotFoundException)
+        {
+            throw new DirectoryNotFoundException($"Cannot access parent directory for '{dataDirectory}'. Check path and permissions.");
         }
     }
 
-    private static async Task<string> EnsureDatabaseDirectoryAsync(string? connectionString, ILogger logger)
+    private static async Task TestWritePermissionsAsync(string folderPath, ILogger logger)
+    {
+        try
+        {
+            var testFile = Path.Combine(folderPath, "permission_test.tmp");
+            await File.WriteAllTextAsync(testFile, "Permission test");
+            File.Delete(testFile);
+            logger.LogInformation("? Write permissions verified");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            throw new UnauthorizedAccessException($"Cannot write to data folder '{folderPath}'. The application needs write permissions to this folder.");
+        }
+    }
+
+    private static async Task InitializeDatabaseAsync(StatusDbContext context, string? connectionString, string contentRoot, ILogger logger)
     {
         if (string.IsNullOrEmpty(connectionString))
         {
-            throw new InvalidOperationException("Database connection string is not configured");
+            throw new InvalidOperationException("Database connection string is not configured in appsettings.json");
         }
 
-        // Extract database file path from connection string
-        var dataSource = ExtractDataSourceFromConnectionString(connectionString);
-        var fullPath = Path.GetFullPath(dataSource);
-        var directory = Path.GetDirectoryName(fullPath);
-
-        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        try
         {
-            logger.LogInformation("Creating database directory: {Directory}", directory);
-            Directory.CreateDirectory(directory);
+            // Extract and resolve database path
+            var dataSource = ExtractDataSourceFromConnectionString(connectionString);
+            string databasePath;
+            
+            if (Path.IsPathRooted(dataSource))
+            {
+                databasePath = dataSource;
+            }
+            else
+            {
+                databasePath = Path.Combine(contentRoot, dataSource);
+            }
+            
+            databasePath = Path.GetFullPath(databasePath);
+            logger.LogInformation("??? Database file: {DatabasePath}", databasePath);
+            
+            // Ensure database directory exists
+            var databaseDir = Path.GetDirectoryName(databasePath);
+            if (!string.IsNullOrEmpty(databaseDir) && !Directory.Exists(databaseDir))
+            {
+                Directory.CreateDirectory(databaseDir);
+                logger.LogInformation("?? Created database directory");
+            }
+            
+            // Test database connectivity
+            var canConnect = await context.Database.CanConnectAsync();
+            if (!canConnect)
+            {
+                logger.LogInformation("?? Creating database...");
+                await context.Database.EnsureCreatedAsync();
+                logger.LogInformation("? Database created successfully");
+            }
+            else
+            {
+                logger.LogInformation("? Database connection verified");
+            }
+            
+            // Verify database structure
+            var serviceCount = await context.ServiceStatuses.CountAsync();
+            logger.LogInformation("?? Found {ServiceCount} existing service records", serviceCount);
         }
-
-        logger.LogInformation("Database will be located at: {DatabasePath}", fullPath);
-        return fullPath;
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Database initialization failed: {ex.Message}", ex);
+        }
     }
 
     private static string ExtractDataSourceFromConnectionString(string connectionString)
     {
-        // Handle different SQLite connection string formats
         var keyValuePairs = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
         
         foreach (var pair in keyValuePairs)
@@ -139,33 +187,5 @@ public static class DatabaseExtensions
         }
         
         throw new InvalidOperationException($"Could not extract Data Source from connection string: {connectionString}");
-    }
-
-    private static async Task TestDatabaseWritePermissions(StatusDbContext context, ILogger logger)
-    {
-        try
-        {
-            // Test write permissions by attempting a simple operation
-            var testQuery = "SELECT 1";
-            await context.Database.ExecuteSqlRawAsync(testQuery);
-            logger.LogInformation("Database write permissions verified");
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Database write permission test failed. Check file permissions on the database directory.");
-            throw new InvalidOperationException("Database write permissions are insufficient", ex);
-        }
-    }
-
-    private static void LogTroubleshootingTips(ILogger logger)
-    {
-        logger.LogInformation("Database initialization troubleshooting tips:");
-        logger.LogInformation("1. Ensure the application has write permissions to the data directory");
-        logger.LogInformation("2. Check that SQLite is available (included with .NET 8)");
-        logger.LogInformation("3. Verify sufficient disk space is available");
-        logger.LogInformation("4. For IIS: Ensure IIS_IUSRS has modify permissions on the App_Data folder");
-        logger.LogInformation("5. For IIS: Grant permissions to 'IIS AppPool\\YourAppPoolName' identity");
-        logger.LogInformation("6. Check Windows Event Viewer for additional error details");
-        logger.LogInformation("7. Try running the application with elevated permissions temporarily for testing");
     }
 }

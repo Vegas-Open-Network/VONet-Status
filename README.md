@@ -36,12 +36,12 @@ A comprehensive service status monitoring dashboard built with ASP.NET Core Razo
 
 When you first start the application:
 
-1. **Database Creation**: SQLite database is automatically created in the application directory
-2. **Initial State**: The status page will show "System Initializing" until first checks are run
+1. **Automatic Setup**: Application creates `App_Data` folder and SQLite database automatically
+2. **Permission Check**: If folder creation fails, clear error messages are displayed
 3. **Configuration**: Services are loaded from `appsettings.json`
-4. **Auto-Population**: The system will begin monitoring configured services automatically
+4. **Self-Healing**: System automatically recovers when permissions are fixed
 
-If you encounter any issues during first run, check the application logs for detailed error information.
+If you encounter permission errors, follow the on-screen instructions to fix folder permissions.
 
 ## Configuration
 
@@ -487,104 +487,12 @@ export StatusConfiguration__CronToken="your-secure-token"
 docker run -e StatusConfiguration__CronToken="your-secure-token" vonet-status
 ```
 
-### IIS/Windows Deployment
-
-#### Quick Deployment with PowerShell Script
-
-1. **Run the automated deployment script**:
-   ```powershell
-   # Run as Administrator
-   .\deploy-iis.ps1
-   ```
-
-2. **Manual Deployment Steps**:
-
-   **Prerequisites**:
-   - Install .NET 8 Hosting Bundle from [Microsoft](https://dotnet.microsoft.com/download/dotnet/8.0)
-   - Ensure IIS is installed with ASP.NET Core module
-
-   **Build and Publish**:
-   ```bash
-   dotnet publish -c Release -o ./publish
-   ```
-
-   **Directory Structure**:
-   ```
-   C:\inetpub\wwwroot\VONet-Status\    # Application files (READ-ONLY)
-   C:\VONet-Data\                      # Database files (READ/WRITE)
-   ```
-
-   **Permissions Setup**:
-   ```powershell
-   # Application directory - Read Only
-   icacls "C:\inetpub\wwwroot\VONet-Status" /grant "IIS_IUSRS:(OI)(CI)RX"
-   icacls "C:\inetpub\wwwroot\VONet-Status" /grant "IIS AppPool\VONet-Status:(OI)(CI)RX"
-   
-   # Data directory - Read/Write
-   icacls "C:\VONet-Data" /grant "IIS_IUSRS:(OI)(CI)M"
-   icacls "C:\VONet-Data" /grant "IIS AppPool\VONet-Status:(OI)(CI)M"
-   ```
-
-   **Application Pool Configuration**:
-   - .NET CLR version: **No Managed Code**
-   - Managed pipeline mode: **Integrated**
-   - Identity: **ApplicationPoolIdentity**
-
-   **Production Configuration**:
-   Use `appsettings.Production.json` for production settings:
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "Data Source=C:\\VONet-Data\\status_history.db"
-     },
-     "DataDirectory": "C:\\VONet-Data"
-   }
-   ```
-
-#### Database Folder Options
-
-**Option 1: Secure External Data Folder (Recommended)**
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=C:\\VONet-Data\\status_history.db"
-  },
-  "DataDirectory": "C:\\VONet-Data"
-}
-```
-
-**Option 2: App_Data Folder (Simple)**
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=App_Data\\status_history.db"
-  },
-  "DataDirectory": "App_Data"
-}
-```
-
-#### Troubleshooting Database Issues
-
-**"System Initializing" persists**:
-1. Check application logs in `logs\stdout` folder
-2. Verify write permissions on data directory
-3. Ensure .NET 8 Hosting Bundle is installed
-4. Check Windows Event Viewer for detailed errors
-
-**Database permission errors**:
-```powershell
-# Grant full control to data directory
-icacls "C:\VONet-Data" /grant "IIS AppPool\VONet-Status:(OI)(CI)F"
-
-# Check current permissions
-icacls "C:\VONet-Data"
-```
-
-**Database file not created**:
-1. Ensure data directory exists and has write permissions
-2. Check disk space availability
-3. Verify antivirus isn't blocking SQLite operations
-4. Try running application pool with higher privileges temporarily
+### Linux/Nginx
+1. Publish: `dotnet publish -c Release -o ./publish`
+2. Configure reverse proxy in Nginx
+3. Set up systemd service for the application
+4. Configure SSL certificates
+5. Set environment variables for token
 
 ## Troubleshooting
 

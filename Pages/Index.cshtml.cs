@@ -24,6 +24,25 @@ namespace VONet_Stats.Pages
         {
             try
             {
+                // Check if database is healthy first
+                var isDatabaseHealthy = await _statusService.IsDatabaseHealthyAsync();
+                
+                if (!isDatabaseHealthy)
+                {
+                    // Database not healthy - show initialization message
+                    Services = new List<ServiceStatusViewModel>();
+                    RecentIncidents = new List<IncidentViewModel>();
+                    OverallStatus = new Services.SystemOverallStatus
+                    {
+                        Status = "System Initializing - Database not accessible",
+                        StatusClass = "status-unknown", 
+                        Uptime = 0,
+                        LastUpdated = DateTime.UtcNow
+                    };
+                    ServiceHistory = new Dictionary<string, List<StatusHistoryPoint>>();
+                    return;
+                }
+
                 Services = await _statusService.GetCurrentStatusAsync();
                 RecentIncidents = await _statusService.GetRecentIncidentsAsync();
                 OverallStatus = await _statusService.GetOverallStatusAsync();
@@ -35,16 +54,32 @@ namespace VONet_Stats.Pages
                     ServiceHistory[service.ServiceId] = history;
                 }
             }
-            catch (Exception ex)
+            catch (UnauthorizedAccessException)
             {
-                _logger.LogError(ex, "Error loading status page data");
+                _logger.LogError("Permission error detected on status page load");
                 
-                // Fallback to empty data with clear indication of the issue
+                // Permission issue - show clear error
                 Services = new List<ServiceStatusViewModel>();
                 RecentIncidents = new List<IncidentViewModel>();
                 OverallStatus = new Services.SystemOverallStatus
                 {
-                    Status = "System Initializing - Please wait or run initial check",
+                    Status = "Permission Error - Cannot access data folder",
+                    StatusClass = "status-error",
+                    Uptime = 0,
+                    LastUpdated = DateTime.UtcNow
+                };
+                ServiceHistory = new Dictionary<string, List<StatusHistoryPoint>>();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading status page data");
+                
+                // General error - show initialization message
+                Services = new List<ServiceStatusViewModel>();
+                RecentIncidents = new List<IncidentViewModel>();
+                OverallStatus = new Services.SystemOverallStatus
+                {
+                    Status = "System Initializing - Please wait or check logs for details",
                     StatusClass = "status-unknown",
                     Uptime = 0,
                     LastUpdated = DateTime.UtcNow
