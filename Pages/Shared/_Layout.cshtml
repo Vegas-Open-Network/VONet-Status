@@ -1,102 +1,154 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light">
     <title>@ViewData["Title"] - VONet Status</title>
+    
+    <!-- Stylesheets -->
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/VONet_Stats.styles.css" asp-append-version="true" />
-    <!-- Bootstrap Icons for better visual elements -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <!-- Robots meta tag to discourage indexing of admin pages -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <!-- Meta tags -->
+    <meta name="description" content="VONet Status Dashboard - Real-time system status monitoring">
+    <meta name="theme-color" content="#28a745">
+    
+    <!-- Robots meta tag for admin pages -->
     @if (Context.Request.Path.StartsWithSegments("/check"))
     {
         <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
     }
+    
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm">
+            <div class="container-fluid">
                 <a class="navbar-brand" asp-area="" asp-page="/Index">
-                    <i class="bi bi-shield-check text-success me-2"></i>VONet Status
+                    <i class="bi bi-shield-check text-success me-2" aria-hidden="true"></i>
+                    <span>VONet Status</span>
                 </a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+                
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
+                
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Index">
-                                <i class="bi bi-house me-1"></i>Status
+                            <a class="nav-link" asp-area="" asp-page="/Index" aria-current="page">
+                                <i class="bi bi-house me-1" aria-hidden="true"></i>Status
                             </a>
                         </li>
                     </ul>
-                    <div class="navbar-text">
+                    
+                    <div class="navbar-text d-none d-sm-block">
                         <small class="text-muted">
-                            <i class="bi bi-clock me-1"></i>
-                            <span id="current-time"></span>
+                            <i class="bi bi-clock me-1" aria-hidden="true"></i>
+                            <span id="current-time" aria-live="polite"></span>
                         </small>
                     </div>
                 </div>
             </div>
         </nav>
     </header>
-    <div class="container-fluid">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
 
-    <footer class="border-top footer text-muted mt-5">
+    <main role="main">
+        @RenderBody()
+    </main>
+
+    <footer class="footer">
         <div class="container text-center">
-            <div class="row">
-                <div class="col-12">
-                    <p class="mb-1">&copy; @DateTime.Now.Year - VONet Status Dashboard</p>
-                    <p class="mb-0">
-                        <small>
-                            Content is available under 
-                            <a href="https://creativecommons.org/licenses/by-sa/4.0/" class="text-muted text-decoration-none" target="_blank" rel="noopener">
-                                CC BY-SA 4.0
-                            </a> 
-                            unless otherwise noted | 
-                            <a href="https://github.com/Vegas-Open-Network/VONet-Status" class="text-muted text-decoration-none" target="_blank" rel="noopener">
-                                <i class="bi bi-github me-1"></i>Source Code
-                            </a>
-                        </small>
-                    </p>
-                </div>
-            </div>
+            <p class="mb-1">&copy; @DateTime.Now.Year - VONet Status Dashboard</p>
+            <p class="mb-0">
+                <small>
+                    Content is available under 
+                    <a href="https://creativecommons.org/licenses/by-sa/4.0/" class="text-decoration-none" target="_blank" rel="noopener">
+                        CC BY-SA 4.0
+                    </a> 
+                    unless otherwise noted | 
+                    <a href="https://github.com/Vegas-Open-Network/VONet-Status" class="text-decoration-none" target="_blank" rel="noopener">
+                        <i class="bi bi-github me-1" aria-hidden="true"></i>Source Code
+                    </a>
+                </small>
+            </p>
         </div>
     </footer>
 
+    <!-- Scripts -->
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
 
-    <!-- Auto-refresh and real-time updates -->
+    <!-- Core functionality -->
     <script>
-        // Update current time
+        // Update current time with better formatting
         function updateTime() {
             const now = new Date();
-            document.getElementById('current-time').textContent = now.toLocaleTimeString();
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = now.toLocaleTimeString([], {
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false
+                });
+            }
         }
         
         // Update time every second
         setInterval(updateTime, 1000);
         updateTime(); // Initial call
         
-        // Auto-refresh page every 5 minutes for latest status (only on status page)
+        // Enhanced auto-refresh for status page
         @if (Context.Request.Path == "/")
         {
             <text>
-            setTimeout(function() {
-                location.reload();
+            // Auto-refresh page every 5 minutes for latest status
+            let refreshTimer = setTimeout(function() {
+                // Show notification before refresh
+                const notification = document.createElement('div');
+                notification.className = 'alert alert-info position-fixed top-0 start-50 translate-middle-x mt-3';
+                notification.style.zIndex = '9999';
+                notification.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Refreshing status...';
+                document.body.appendChild(notification);
+                
+                setTimeout(() => location.reload(), 1000);
             }, 300000); // 5 minutes
+            
+            // Allow manual refresh cancellation
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    clearTimeout(refreshTimer);
+                } else {
+                    // Restart timer when page becomes visible
+                    refreshTimer = setTimeout(() => location.reload(), 300000);
+                }
+            });
             </text>
         }
+        
+        // Improve accessibility
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add keyboard navigation for history squares
+            document.querySelectorAll('.history-square').forEach(square => {
+                square.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        // Show tooltip content as alert for screen readers
+                        const title = this.getAttribute('title');
+                        if (title) {
+                            alert(title);
+                        }
+                    }
+                });
+            });
+        });
     </script>
 
     @await RenderSectionAsync("Scripts", required: false)
